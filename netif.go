@@ -29,6 +29,8 @@ var ReceiveUDPDataCallback func(data []byte, srcIP net.IP, srcPort uint16, dstIP
 // @param ttl
 var ReceiveICMPDataCallback func(data []byte, srcIP, dstIP net.IP, ttl uint8)
 
+var MTU uint16 = 9000
+
 var identifer uint16 = 0
 
 // 输入IP包数据

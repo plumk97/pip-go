@@ -7,7 +7,6 @@ import (
 
 const (
 	_TCP_WIND = 65535
-	_MTU      = 9000
 )
 
 type TCPStatus int
@@ -98,7 +97,7 @@ func newTCP() *TCP {
 
 	tcp := &TCP{
 		packetQueue: NewQueue[*TCPPacket](),
-		mss:         _MTU - 40,
+		mss:         MTU - 40,
 		wind:        _TCP_WIND,
 	}
 	return tcp
