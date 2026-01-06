@@ -47,7 +47,7 @@ func (n *Netif) tcpCheck(tcp *TCP, curTime time.Time) bool {
 
 	if (tcp.status == TCPStatusFinWait1 || tcp.status == TCPStatusFinWait2 || tcp.status == TCPStatusCloseWait) && (curTime.Sub(tcp.finTime) > 20*time.Second) {
 		// 处于等待关闭状态 并且等待时间已经大于20秒 直接关闭
-		tcp.release(&tcp.locker)
+		tcp.release()
 		return true
 	}
 

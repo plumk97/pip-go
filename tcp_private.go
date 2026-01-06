@@ -2,7 +2,6 @@ package pipgo
 
 import (
 	"encoding/binary"
-	"sync"
 	"syscall"
 	"time"
 
@@ -27,27 +26,15 @@ func tcpIncreaseSeq(seq uint32, flags uint8, datalen uint16) uint32 {
 }
 
 // 释放资源
-func (tcp *TCP) release(mutex *sync.Mutex) {
+func (tcp *TCP) release() {
 	if tcp.status == TCPStatusReleased {
 		return
 	}
 	tcp.status = TCPStatusReleased
-
-	arg := tcp.Arg
+	tcp.events = append(tcp.events, &tcpClosedEvent{
+		arg: tcp.Arg,
+	})
 	tcp.Arg = nil
-
-	if tcp.ClosedCallback != nil {
-
-		if mutex != nil {
-			mutex.Unlock()
-		}
-		tcp.ClosedCallback(tcp, arg)
-		if mutex != nil {
-			mutex.Lock()
-		}
-
-		tcp.ClosedCallback = nil
-	}
 }
 
 // 发送数据包
@@ -149,13 +136,13 @@ func (tcp *TCP) handleSyn(options []byte) {
 }
 
 // 处理断开连接
-func (tcp *TCP) handleFin(mutex *sync.Mutex) {
+func (tcp *TCP) handleFin() {
 
 	switch tcp.status {
 	case TCPStatusFinWait2:
 		packet := newTCPPacket(tcp, types.TH_ACK, nil, nil)
 		tcp.sendPacket(packet)
-		tcp.release(mutex)
+		tcp.release()
 
 	case TCPStatusEstablished:
 		tcp.status = TCPStatusCloseWait
@@ -168,7 +155,7 @@ func (tcp *TCP) handleFin(mutex *sync.Mutex) {
 }
 
 // 处理ACK确认
-func (tcp *TCP) handleAck(ack uint32, isUpdateWind bool, locker *sync.Mutex) {
+func (tcp *TCP) handleAck(ack uint32, isUpdateWind bool) {
 
 	hasSyn := false
 	hasFin := false
@@ -200,19 +187,15 @@ func (tcp *TCP) handleAck(ack uint32, isUpdateWind bool, locker *sync.Mutex) {
 
 	if hasSyn {
 		tcp.status = TCPStatusEstablished
-		if tcp.ConnectedCallback != nil {
-			locker.Unlock()
-			tcp.ConnectedCallback(tcp)
-			locker.Lock()
-		}
+		tcp.events = append(tcp.events, &tcpConnectedEvent{})
 	}
 
 	if writtenLen > 0 || isUpdateWind {
-		if tcp.WrittenCallback != nil {
-			locker.Unlock()
-			tcp.WrittenCallback(tcp, writtenLen, hasPush, false)
-			locker.Lock()
-		}
+		tcp.events = append(tcp.events, &tcpWrittenEvent{
+			writtenLen: writtenLen,
+			hasPush:    hasPush,
+			isDrop:     false,
+		})
 	}
 
 	if hasFin {
@@ -224,19 +207,16 @@ func (tcp *TCP) handleAck(ack uint32, isUpdateWind bool, locker *sync.Mutex) {
 
 		case TCPStatusCloseWait:
 			/// 被动关闭 清理资源
-			tcp.release(locker)
+			tcp.release()
 		}
 	}
 
 }
 
 // 处理数据接收
-func (tcp *TCP) handleReceive(data []byte, locker *sync.Mutex) {
+func (tcp *TCP) handleReceive(data []byte) {
 	tcp.wind -= uint16(len(data))
-
-	if tcp.ReceivedCallback != nil {
-		locker.Unlock()
-		tcp.ReceivedCallback(tcp, data)
-		locker.Lock()
-	}
+	tcp.events = append(tcp.events, &tcpReceivedEvent{
+		data: data,
+	})
 }

@@ -54,6 +54,8 @@ func (n *Netif) tcpInput(data []byte, ipHeader *types.IPHeader) {
 
 // TCP 处理输入的TCP包
 func (tcp *TCP) input(hdr types.TCPHdr, head []byte, data []byte, datalen uint16) {
+	defer tcp.processEvents()
+
 	tcp.locker.Lock()
 	defer tcp.locker.Unlock()
 
@@ -64,7 +66,7 @@ func (tcp *TCP) input(hdr types.TCPHdr, head []byte, data []byte, datalen uint16
 
 	if hdr.Flags()&types.TH_RST > 0 {
 		// 处理RST包
-		tcp.release(&tcp.locker)
+		tcp.release()
 		return
 	}
 
@@ -90,12 +92,12 @@ func (tcp *TCP) input(hdr types.TCPHdr, head []byte, data []byte, datalen uint16
 
 	// 处理ACK和数据包
 	if hdr.Flags()&types.TH_ACK > 0 {
-		tcp.handleAck(hdr.Ack(), isUpdateWind, &tcp.locker)
+		tcp.handleAck(hdr.Ack(), isUpdateWind)
 	}
 
 	// 处理收到的数据
 	if hdr.Flags()&types.TH_PUSH > 0 || datalen > 0 {
-		tcp.handleReceive(data, &tcp.locker)
+		tcp.handleReceive(data)
 	}
 
 	if tcp.status == TCPStatusReleased {
@@ -106,15 +108,13 @@ func (tcp *TCP) input(hdr types.TCPHdr, head []byte, data []byte, datalen uint16
 	if hdr.Flags()&types.TH_SYN > 0 {
 		// 新建连接
 		tcp.status = TCPStatusWaitEstablishing
-		if tcp.netif.NewTCPConnect != nil {
-			tcp.locker.Unlock()
-			tcp.netif.NewTCPConnect(tcp.netif, tcp, head)
-			tcp.locker.Lock()
-		}
+		tcp.events = append(tcp.events, &tcpNewEvent{
+			head: head,
+		})
 	}
 
 	// 处理FIN包
 	if hdr.Flags()&types.TH_FIN > 0 {
-		tcp.handleFin(&tcp.locker)
+		tcp.handleFin()
 	}
 }

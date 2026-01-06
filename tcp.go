@@ -77,6 +77,9 @@ type TCP struct {
 	// 窗口缩放位移位数
 	oppWindShift uint8
 
+	// 事件
+	events []any
+
 	// 外部使用-用于区分
 	Arg any
 

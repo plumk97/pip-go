@@ -58,12 +58,14 @@ func (tcp *TCP) Connected(handshakeData []byte) {
 
 // 关闭连接
 func (tcp *TCP) Close() {
+	defer tcp.processEvents()
+
 	tcp.locker.Lock()
 	defer tcp.locker.Unlock()
 
 	switch tcp.status {
 	case TCPStatusWaitClosed:
-		tcp.release(&tcp.locker)
+		tcp.release()
 
 	case TCPStatusWaitEstablishing,
 		TCPStatusEstablishing:
