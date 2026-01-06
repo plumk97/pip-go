@@ -1,6 +1,7 @@
 package pipgo
 
 import (
+	"maps"
 	"time"
 
 	"github.com/plumk97/pip-go/types"
@@ -24,20 +25,33 @@ func (n *Netif) startTCPTimer() {
 
 func (n *Netif) tcpTimerTick() {
 
-	curTime := time.Now()
+	// 复制一份连接列表 避免锁住太久
+	n.locker.Lock()
 	if len(n.tcps) <= 0 {
+		n.locker.Unlock()
 		return
 	}
 
-	for key, tcp := range n.tcps {
+	tcps := map[uint32]*TCP{}
+	maps.Copy(tcps, n.tcps)
+	n.locker.Unlock()
+
+	curTime := time.Now()
+	for key, tcp := range tcps {
 		isRemove := n.tcpCheck(tcp, curTime)
+
+		// 删除连接
 		if isRemove {
+			n.locker.Lock()
 			delete(n.tcps, key)
+			n.locker.Unlock()
 		}
 	}
 }
 
 func (n *Netif) tcpCheck(tcp *TCP, curTime time.Time) bool {
+	defer tcp.processEvents()
+
 	tcp.locker.Lock()
 	defer tcp.locker.Unlock()
 
@@ -70,11 +84,11 @@ func (n *Netif) tcpCheck(tcp *TCP, curTime time.Time) bool {
 						tcp.isWaitPushAck = false
 					}
 
-					if tcp.WrittenCallback != nil {
-						tcp.locker.Unlock()
-						tcp.WrittenCallback(tcp, packet.payloadLen, hasPush, true)
-						tcp.locker.Lock()
-					}
+					tcp.events = append(tcp.events, &tcpWrittenEvent{
+						writtenLen: packet.payloadLen,
+						hasPush:    hasPush,
+						isDrop:     true,
+					})
 				}
 
 			} else {
