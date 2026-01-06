@@ -1,0 +1,6 @@
+github.com/labulakalia/water v0.0.4 h1:igw8mqpbdNKrVKLYA+BYoJvqiOjO4aAaCBcEp0jSXio=
+github.com/labulakalia/water v0.0.4/go.mod h1:Rt5j0n1K2IHqMBgW/tsXLp1wt98kLSCD6krteM6s9Pc=
+golang.org/x/sys v0.3.0 h1:w8ZOecv6NaNa/zC8944JTU3vz4u6Lagfk4RPQxv92NQ=
+golang.org/x/sys v0.3.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
+golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2 h1:B82qJJgjvYKsXS9jeunTOisW56dUokqW/FOteYJJ/yg=
+golang.zx2c4.com/wintun v0.0.0-20230126152724-0fa3db229ce2/go.mod h1:deeaetjYA+DHMHg+sMSMI58GrEteJUUzzw7en6TJQcI=

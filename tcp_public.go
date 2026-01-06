@@ -1,0 +1,183 @@
+package pipgo
+
+import (
+	"time"
+
+	"github.com/plumk97/pip-go/lib/chainbuf"
+	"github.com/plumk97/pip-go/types"
+)
+
+// 连接标识
+func (tcp *TCP) Iden() uint32 {
+	return tcp.iden
+}
+
+// 获取连接状态
+func (tcp *TCP) Status() TCPStatus {
+	return tcp.status
+}
+
+// 获取连接的IP头
+func (tcp *TCP) IPHeader() *types.IPHeader {
+	return tcp.ipHeader
+}
+
+// 获取源端口
+func (tcp *TCP) SrcPort() uint16 {
+	return tcp.srcPort
+}
+
+// 获取目的端口
+func (tcp *TCP) DstPort() uint16 {
+	return tcp.dstPort
+}
+
+// 对方报文左移窗口大小
+func (tcp *TCP) OppWindShift() uint16 {
+	return uint16(tcp.oppWindShift)
+}
+
+//	建立连接
+//
+// @param handshakeData 发起连接时的握手数据
+func (tcp *TCP) Connected(handshakeData []byte) {
+	tcp.locker.Lock()
+	defer tcp.locker.Unlock()
+
+	if tcp.status != TCPStatusWaitEstablishing {
+		return
+	}
+
+	hdr := types.TCPHdr(handshakeData)
+	if hdr.Off() > 5 {
+		tcp.handleSyn(handshakeData[20:])
+	} else {
+		tcp.handleSyn(nil)
+	}
+}
+
+// 关闭连接
+func (tcp *TCP) Close() {
+	tcp.locker.Lock()
+	defer tcp.locker.Unlock()
+
+	switch tcp.status {
+	case TCPStatusWaitClosed:
+		tcp.release(&tcp.locker)
+
+	case TCPStatusWaitEstablishing,
+		TCPStatusEstablishing:
+		tcp._reset()
+
+	case TCPStatusEstablished:
+		tcp.status = TCPStatusFinWait1
+		tcp.finTime = time.Now()
+
+		packet := newTCPPacket(tcp, types.TH_FIN|types.TH_ACK, nil, nil)
+		tcp.packetQueue.Push(packet)
+		tcp.sendPacket(packet)
+	}
+
+}
+
+// 重置连接
+func (tcp *TCP) Reset() {
+	tcp.locker.Lock()
+	defer tcp.locker.Unlock()
+	tcp._reset()
+}
+
+func (tcp *TCP) _reset() {
+	switch tcp.status {
+	case TCPStatusWaitEstablishing,
+		TCPStatusEstablishing,
+		TCPStatusEstablished:
+		packet := newTCPPacket(tcp, types.TH_RST|types.TH_ACK, nil, nil)
+		tcp.sendPacket(packet)
+	}
+}
+
+// 发送数据 返回发送的长度
+// @param data 待发送数据
+func (tcp *TCP) Write(data []byte) int {
+	tcp.locker.Lock()
+	defer tcp.locker.Unlock()
+
+	if tcp.status != TCPStatusEstablished || !tcp._canWrite() {
+		return 0
+	}
+
+	datalen := len(data)
+	offset := 0
+	for offset < len(data) && tcp.oppWind > 0 {
+
+		writeLen := int(tcp.oppMss)
+
+		/// 获取小于等于mss的数据长度
+		if offset+writeLen > datalen {
+			writeLen = datalen - offset
+		}
+
+		/// 获取小于等于对方的窗口长度
+		if uint32(writeLen) > tcp.oppWind {
+			writeLen = int(tcp.oppWind)
+		}
+
+		if writeLen <= 0 {
+			break
+		}
+
+		/// 如果当前发送数据大于等于总数据长度 或者 对方窗口为0 则发送PUSH标签
+		isPush := offset+writeLen >= datalen || writeLen >= int(tcp.oppWind)
+
+		payloadBuf := chainbuf.NewChainBuffer(data[offset : offset+writeLen])
+
+		var packet *TCPPacket
+		if isPush {
+			packet = newTCPPacket(tcp, types.TH_PUSH|types.TH_ACK, nil, payloadBuf)
+			tcp.isWaitPushAck = true
+		} else {
+			packet = newTCPPacket(tcp, types.TH_ACK, nil, payloadBuf)
+		}
+
+		tcp.packetQueue.Push(packet)
+		tcp.sendPacket(packet)
+
+		offset += writeLen
+		tcp.oppWind -= uint32(writeLen)
+	}
+
+	return offset
+}
+
+// 接受数据之后调用更新窗口
+// @param len 接受的数据大小
+func (tcp *TCP) Received(len uint16) {
+	tcp.locker.Lock()
+	defer tcp.locker.Unlock()
+
+	if tcp.status != TCPStatusEstablished {
+		return
+	}
+
+	tcp.wind += len
+	if tcp.wind > _TCP_WIND {
+		tcp.wind = _TCP_WIND
+	}
+
+	if tcp.ack-uint32(len) == tcp.oppSeq || tcp.wind-len <= 0 {
+		tcp.sendAck()
+	}
+
+}
+
+// 写之前调用该方法判断当前是否能写
+func (tcp *TCP) CanWrite() bool {
+	tcp.locker.Lock()
+	defer tcp.locker.Unlock()
+	return tcp._canWrite()
+}
+
+func (tcp *TCP) _canWrite() bool {
+	return !tcp.isWaitPushAck
+}
