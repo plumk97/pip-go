@@ -30,7 +30,7 @@ type TCP struct {
 	netif  *Netif
 
 	// 连接标识
-	iden uint32
+	key TCPKey
 
 	// 包队列
 	packetQueue *queue.Queue[*TCPPacket]
@@ -84,20 +84,20 @@ type TCP struct {
 	Arg any
 
 	// 建立连接完成回调
-	ConnectedCallback func(tcp *TCP)
+	OnConnected func(tcp *TCP)
 
 	// 关闭回调 在这个时候资源已经释放完成
-	ClosedCallback func(tcp *TCP, arg any)
+	OnClosed func(tcp *TCP, arg any)
 
 	// 数据接收回调
 	// 数据处理完成需要调用Received更新窗口
-	ReceivedCallback func(tcp *TCP, data []byte)
+	OnReceived func(tcp *TCP, data []byte)
 
 	// 数据发送完成回调 writeen_len完成发送的字节
 	// @param writeen_len 已经发送的字节长度 如果为0 则代表之前对方的wind为0 当前已经更新 可以继续写入
 	// @param has_push 是否包含push包
 	// @param is_drop 该包是否已经丢弃
-	WrittenCallback func(tcp *TCP, writtenLen int, hasPush bool, isDrop bool)
+	OnWritten func(tcp *TCP, writtenLen int, hasPush bool, isDrop bool)
 }
 
 func newTCP(netif *Netif) *TCP {

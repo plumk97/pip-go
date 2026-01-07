@@ -3,6 +3,7 @@ package transfer
 import (
 	"log"
 	"net"
+	"net/netip"
 	"runtime"
 	"syscall"
 
@@ -10,9 +11,9 @@ import (
 	"github.com/plumk97/pip-go/types"
 )
 
-func receiveICMPDataCallback(netif *pipgo.Netif, data []byte, srcIP, dstIP net.IP, ttl uint8) {
+func onICMP(netif *pipgo.Netif, data []byte, srcIP, dstIP netip.Addr, ttl uint8) {
 
-	conn, err := net.DialIP("ip:icmp", &net.IPAddr{IP: outboundIp}, &net.IPAddr{IP: dstIP})
+	conn, err := net.DialIP("ip:icmp", &net.IPAddr{IP: outboundIp}, &net.IPAddr{IP: dstIP.AsSlice()})
 	if err != nil {
 		log.Println(err)
 		return

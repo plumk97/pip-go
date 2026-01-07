@@ -3,7 +3,7 @@ package tests_test
 import (
 	"encoding/hex"
 	"fmt"
-	"net"
+	"net/netip"
 	"testing"
 
 	pipgo "github.com/plumk97/pip-go"
@@ -21,7 +21,7 @@ func TestNetif(t *testing.T) {
 
 func init() {
 	netif = pipgo.NewNetif()
-	netif.ReceiveUDPData = func(netif *pipgo.Netif, data []byte, srcIP net.IP, srcPort uint16, dstIP net.IP, dstPort uint16) {
+	netif.OnUDPData = func(netif *pipgo.Netif, data []byte, srcIP netip.Addr, srcPort uint16, dstIP netip.Addr, dstPort uint16) {
 		fmt.Println(data, srcIP, dstIP, srcPort, dstPort)
 	}
 }

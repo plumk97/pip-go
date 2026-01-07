@@ -14,9 +14,9 @@ var outboundIp net.IP
 func Bind(netif *pipgo.Netif, ifceName string) {
 	outboundIp = getOutboundIP(ifceName)
 
-	netif.NewTCPConnect = newTCPConnectCallback
-	netif.ReceiveUDPData = receiveUDPDataCallback
-	netif.ReceiveICMPData = receiveICMPDataCallback
+	netif.OnTCPConnect = onTCPConnect
+	netif.OnUDPData = onUDPData
+	netif.OnICMPData = onICMP
 }
 
 func getOutboundIP(ifceName string) net.IP {

@@ -52,7 +52,7 @@ func main() {
 	transfer.Bind(netif, ifce.Name())
 
 	// 初始化回调函数
-	netif.OutputIPData = func(netif *pipgo.Netif, buf *chainbuf.ChainBuffer) {
+	netif.OnIPData = func(netif *pipgo.Netif, buf *chainbuf.ChainBuffer) {
 		b := make([]byte, buf.TotalLen())
 
 		offset := 0

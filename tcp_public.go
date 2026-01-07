@@ -8,8 +8,8 @@ import (
 )
 
 // 连接标识
-func (tcp *TCP) Iden() uint32 {
-	return tcp.iden
+func (tcp *TCP) Key() TCPKey {
+	return tcp.key
 }
 
 // 获取连接状态

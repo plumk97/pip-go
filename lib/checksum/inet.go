@@ -3,6 +3,7 @@ package checksum
 import (
 	"encoding/binary"
 	"net"
+	"net/netip"
 
 	"github.com/plumk97/pip-go/lib/chainbuf"
 )
@@ -27,18 +28,21 @@ func InetChecksum(payload []byte, proto uint8, srcIP, dstIP net.IP) uint16 {
 	return uint16(^Checksum(payload, sum))
 }
 
-func InetChecksumBuf(buf *chainbuf.ChainBuffer, proto uint8, srcIP, dstIP net.IP) uint16 {
+func InetChecksumBuf(buf *chainbuf.ChainBuffer, proto uint8, srcIP, dstIP netip.Addr) uint16 {
 
 	var sum uint32 = 0
 
-	for i := 0; i < len(srcIP); i += 4 {
-		addr := binary.BigEndian.Uint32(srcIP[i : i+4])
+	src := srcIP.AsSlice()
+	dst := dstIP.AsSlice()
+
+	for i := 0; i < len(src); i += 4 {
+		addr := binary.BigEndian.Uint32(src[i : i+4])
 		sum += (addr & 0xFFFF0000) >> 16
 		sum += (addr & 0x0000FFFF)
 	}
 
-	for i := 0; i < len(dstIP); i += 4 {
-		addr := binary.BigEndian.Uint32(dstIP[i : i+4])
+	for i := 0; i < len(dst); i += 4 {
+		addr := binary.BigEndian.Uint32(dst[i : i+4])
 		sum += (addr & 0xFFFF0000) >> 16
 		sum += (addr & 0x0000FFFF)
 	}

@@ -1,7 +1,7 @@
 package pipgo
 
 import (
-	"net"
+	"net/netip"
 	"sync"
 
 	"github.com/plumk97/pip-go/lib/chainbuf"
@@ -9,38 +9,38 @@ import (
 	"github.com/plumk97/pip-go/types"
 )
 
-// OutputIPDataCallback 输出IP包数据
-type OutputIPDataCallback func(netif *Netif, buf *chainbuf.ChainBuffer)
+// OnIPData 网络接口输出IP包数据回调函数
+type OnIPData func(netif *Netif, buf *chainbuf.ChainBuffer)
 
-// NewTCPConnectCallback 接受到一个新的TCP连接
-type NewTCPConnectCallback func(netif *Netif, tcp *TCP, handshakeData []byte)
+// OnTCPConnect 接受到一个新的TCP连接
+type OnTCPConnect func(netif *Netif, tcp *TCP, handshakeData []byte)
 
-// ReceiveUDPDataCallback 接受到UDP数据
-type ReceiveUDPDataCallback func(netif *Netif, data []byte, srcIP net.IP, srcPort uint16, dstIP net.IP, dstPort uint16)
+// OnUDPData 接受到UDP数据
+type OnUDPData func(netif *Netif, data []byte, srcIP netip.Addr, srcPort uint16, dstIP netip.Addr, dstPort uint16)
 
-// ReceiveICMPDataCallback 接受到ICMP数据
-type ReceiveICMPDataCallback func(netif *Netif, data []byte, srcIP, dstIP net.IP, ttl uint8)
+// OnICMPData 接受到ICMP数据
+type OnICMPData func(netif *Netif, data []byte, srcIP, dstIP netip.Addr, ttl uint8)
 
 // MTU 最大传输单元
 const MTU uint16 = 9000
 
 // Netif 网络接口
 type Netif struct {
-	OutputIPData    OutputIPDataCallback    // 输出IP包数据
-	NewTCPConnect   NewTCPConnectCallback   // 接受到一个新的TCP连接
-	ReceiveUDPData  ReceiveUDPDataCallback  // 接收到UDP数据
-	ReceiveICMPData ReceiveICMPDataCallback // 接收到ICMP数据
+	OnIPData     OnIPData     // 输出IP包数据
+	OnTCPConnect OnTCPConnect // 接受到一个新的TCP连接
+	OnUDPData    OnUDPData    // 接收到UDP数据
+	OnICMPData   OnICMPData   // 接收到ICMP数据
 
 	locker    sync.Mutex
 	identifer uint16          // IP包标识符
-	tcps      map[uint32]*TCP // 已建立的TCP连接
+	tcps      map[TCPKey]*TCP // 已建立的TCP连接
 	stopTimer chan struct{}   // 停止定时器
 }
 
 // NewNetif 创建一个网络接口
 func NewNetif() *Netif {
 	netif := &Netif{
-		tcps:      make(map[uint32]*TCP),
+		tcps:      make(map[TCPKey]*TCP),
 		identifer: 0,
 		stopTimer: make(chan struct{}),
 	}
@@ -78,7 +78,7 @@ func (n *Netif) Input(bytes []byte) {
 }
 
 // 输出IP包数据 IPv4
-func (n *Netif) output4(buf *chainbuf.ChainBuffer, proto uint8, src, dst net.IP) {
+func (n *Netif) output4(buf *chainbuf.ChainBuffer, proto uint8, src, dst netip.Addr) {
 
 	n.locker.Lock()
 	identifer := n.identifer
@@ -97,19 +97,19 @@ func (n *Netif) output4(buf *chainbuf.ChainBuffer, proto uint8, src, dst net.IP)
 	hdr.SetOff(0x4000) // dont fragment flag
 	hdr.SetTTL(64)
 	hdr.SetProtocol(proto)
-	hdr.SetSrc(src)
-	hdr.SetDst(dst)
+	hdr.SetSrc(src.AsSlice())
+	hdr.SetDst(dst.AsSlice())
 	hdr.SetSum(checksum.IPChecksum(hdr))
 
-	if n.OutputIPData != nil {
-		n.OutputIPData(n, ipHeadBuf)
+	if n.OnIPData != nil {
+		n.OnIPData(n, ipHeadBuf)
 	}
 
 	ipHeadBuf.SetNext(nil)
 }
 
 // 输出IP包数据 IPv6
-func (n *Netif) output6(buf *chainbuf.ChainBuffer, proto uint8, src, dst net.IP) {
+func (n *Netif) output6(buf *chainbuf.ChainBuffer, proto uint8, src, dst netip.Addr) {
 	ipHeadBuf := chainbuf.NewChainBuffer(types.NewIP6Hdr())
 	ipHeadBuf.SetNext(buf)
 
@@ -120,11 +120,11 @@ func (n *Netif) output6(buf *chainbuf.ChainBuffer, proto uint8, src, dst net.IP)
 	hdr.SetPayloadLen(uint16(buf.TotalLen()))
 	hdr.SetNextHeader(proto)
 	hdr.SetHopLimit(64)
-	hdr.SetSrc(src)
-	hdr.SetDst(dst)
+	hdr.SetSrc(src.AsSlice())
+	hdr.SetDst(dst.AsSlice())
 
-	if n.OutputIPData != nil {
-		n.OutputIPData(n, ipHeadBuf)
+	if n.OnIPData != nil {
+		n.OnIPData(n, ipHeadBuf)
 	}
 
 	ipHeadBuf.SetNext(nil)

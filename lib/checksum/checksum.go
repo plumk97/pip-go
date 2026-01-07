@@ -21,7 +21,7 @@ func Checksum(payload []byte, sum uint32) uint32 {
 	}
 
 	if i < len {
-		sum += uint32(payload[i])<<8 | 0
+		sum += uint32(payload[i]) << 8
 	}
 
 	sum = fold(sum)

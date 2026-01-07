@@ -23,34 +23,40 @@ type tcpClosedEvent struct {
 
 // 处理事件
 func (tcp *TCP) processEvents() {
+	tcp.locker.Lock()
 	events := tcp.events
 	tcp.events = nil
+	tcp.locker.Unlock()
 
 	for _, event := range events {
 		switch ev := event.(type) {
 		case *tcpNewEvent:
-			if tcp.netif.NewTCPConnect != nil {
-				tcp.netif.NewTCPConnect(tcp.netif, tcp, ev.head)
+			if tcp.netif.OnTCPConnect != nil {
+				tcp.netif.OnTCPConnect(tcp.netif, tcp, ev.head)
 			}
 
 		case *tcpConnectedEvent:
-			if tcp.ConnectedCallback != nil {
-				tcp.ConnectedCallback(tcp)
+			if tcp.OnConnected != nil {
+				tcp.OnConnected(tcp)
 			}
 
 		case *tcpWrittenEvent:
-			if tcp.WrittenCallback != nil {
-				tcp.WrittenCallback(tcp, ev.writtenLen, ev.hasPush, ev.isDrop)
+			if tcp.OnWritten != nil {
+				tcp.OnWritten(tcp, ev.writtenLen, ev.hasPush, ev.isDrop)
 			}
 
 		case *tcpReceivedEvent:
-			if tcp.ReceivedCallback != nil {
-				tcp.ReceivedCallback(tcp, ev.data)
+			if tcp.OnReceived != nil {
+				tcp.OnReceived(tcp, ev.data)
 			}
 
 		case *tcpClosedEvent:
-			if tcp.ClosedCallback != nil {
-				tcp.ClosedCallback(tcp, ev.arg)
+			tcp.netif.locker.Lock()
+			delete(tcp.netif.tcps, tcp.key)
+			tcp.netif.locker.Unlock()
+
+			if tcp.OnClosed != nil {
+				tcp.OnClosed(tcp, ev.arg)
 			}
 		}
 	}

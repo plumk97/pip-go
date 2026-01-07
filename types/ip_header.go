@@ -1,8 +1,7 @@
 package types
 
 import (
-	"encoding/binary"
-	"net"
+	"net/netip"
 )
 
 type IPHeader struct {
@@ -12,8 +11,8 @@ type IPHeader struct {
 	TTL        uint8
 	Headerlen  uint16
 	Datalen    uint16
-	Src        net.IP
-	Dst        net.IP
+	Src        netip.Addr
+	Dst        netip.Addr
 }
 
 func NewIPHeader(bytes []byte) *IPHeader {
@@ -28,8 +27,10 @@ func NewIPHeader(bytes []byte) *IPHeader {
 		header.TTL = hdr.TTL()
 		header.Headerlen = uint16(hdr.IHL()) * 4
 		header.Datalen = hdr.Len() - header.Headerlen
-		header.Src = hdr.Src()
-		header.Dst = hdr.Dst()
+
+		header.Src = netip.AddrFrom4([4]byte(hdr.Src()))
+		header.Dst = netip.AddrFrom4([4]byte(hdr.Dst()))
+
 	} else {
 		hdr := IP6Hdr(bytes)
 		header.Version = hdr.Version()
@@ -38,27 +39,10 @@ func NewIPHeader(bytes []byte) *IPHeader {
 		header.TTL = hdr.HopLimit()
 		header.Headerlen = 40
 		header.Datalen = hdr.PayloadLen()
-		header.Src = hdr.Src()
-		header.Dst = hdr.Dst()
+
+		header.Src = netip.AddrFrom16([16]byte(hdr.Src()))
+		header.Dst = netip.AddrFrom16([16]byte(hdr.Dst()))
 	}
 
 	return header
-}
-
-// 生成32位标识
-func (h *IPHeader) GenerateIden() uint32 {
-	if h.Version == 4 {
-		return binary.BigEndian.Uint32(h.Src) ^ binary.BigEndian.Uint32(h.Dst) ^ 4
-	}
-
-	var iden uint32 = 0
-	for i := 0; i < 16; i += 4 {
-		iden ^= binary.BigEndian.Uint32(h.Src[i : i+4])
-	}
-
-	for i := 0; i < 16; i += 4 {
-		iden ^= binary.BigEndian.Uint32(h.Dst[i : i+4])
-	}
-	iden ^= 6
-	return iden
 }

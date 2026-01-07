@@ -1,6 +1,8 @@
 package pipgo
 
-import "github.com/plumk97/pip-go/types"
+import (
+	"github.com/plumk97/pip-go/types"
+)
 
 // Input
 func (n *Netif) tcpInput(data []byte, ipHeader *types.IPHeader) {
@@ -12,21 +14,26 @@ func (n *Netif) tcpInput(data []byte, ipHeader *types.IPHeader) {
 	srcPort := hdr.SrcPort()
 	dstPort := hdr.DstPort()
 
-	iden := ipHeader.GenerateIden() ^ uint32(srcPort) ^ uint32(dstPort)
+	key := TCPKey{
+		SrcIP:   ipHeader.Src,
+		DstIP:   ipHeader.Dst,
+		SrcPort: srcPort,
+		DstPort: dstPort,
+	}
 
 	// 查找对应的TCP连接
 	n.locker.Lock()
-	tcp, isOK := n.tcps[iden]
+	tcp, isOK := n.tcps[key]
 
 	// 不存在的连接 如果是SYN包 则建立一个新的连接
 	if !isOK && hdr.Flags()&types.TH_SYN > 0 {
 		tcp = newTCP(n)
-		tcp.iden = iden
-		tcp.seq = iden
+		tcp.key = key
+		tcp.seq = 0
 		tcp.ipHeader = ipHeader
 		tcp.srcPort = srcPort
 		tcp.dstPort = dstPort
-		n.tcps[iden] = tcp
+		n.tcps[key] = tcp
 	}
 	n.locker.Unlock()
 
@@ -35,8 +42,8 @@ func (n *Netif) tcpInput(data []byte, ipHeader *types.IPHeader) {
 		if hdr.Flags()&types.TH_RST <= 0 {
 			// 不存在的连接 直接返回RST
 			tcp = newTCP(n)
-			tcp.iden = iden
-			tcp.seq = iden
+			tcp.key = key
+			tcp.seq = 0
 			tcp.ipHeader = ipHeader
 			tcp.srcPort = srcPort
 			tcp.dstPort = dstPort
@@ -106,7 +113,6 @@ func (tcp *TCP) input(hdr types.TCPHdr, head []byte, data []byte, datalen uint16
 	}
 
 	if hdr.Flags()&types.TH_SYN > 0 {
-		// 新建连接
 		tcp.status = TCPStatusWaitEstablishing
 		tcp.events = append(tcp.events, &tcpNewEvent{
 			head: head,

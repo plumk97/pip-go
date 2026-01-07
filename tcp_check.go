@@ -32,7 +32,7 @@ func (n *Netif) tcpTimerTick() {
 		return
 	}
 
-	tcps := map[uint32]*TCP{}
+	tcps := map[TCPKey]*TCP{}
 	maps.Copy(tcps, n.tcps)
 	n.locker.Unlock()
 

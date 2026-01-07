@@ -2,6 +2,7 @@ package checksum_test
 
 import (
 	"encoding/hex"
+	"net/netip"
 	"syscall"
 	"testing"
 
@@ -45,7 +46,7 @@ func TestInetChecksumBuf(t *testing.T) {
 		udpHdr.SetSum(0)
 		t.Log(hex.EncodeToString(udpHdr))
 
-		udpHdr.SetSum(checksum.InetChecksumBuf(udpHdrBuf, syscall.IPPROTO_UDP, ipHdr.Src(), ipHdr.Dst()))
+		udpHdr.SetSum(checksum.InetChecksumBuf(udpHdrBuf, syscall.IPPROTO_UDP, netip.AddrFrom4([4]byte(ipHdr.Src())), netip.AddrFrom4([4]byte(ipHdr.Dst()))))
 		t.Log(hex.EncodeToString(udpHdr))
 
 	} else {

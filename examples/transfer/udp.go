@@ -3,21 +3,17 @@ package transfer
 import (
 	"log"
 	"net"
+	"net/netip"
 
 	pipgo "github.com/plumk97/pip-go"
 )
 
-func receiveUDPDataCallback(netif *pipgo.Netif, data []byte, srcIP net.IP, srcPort uint16, dstIP net.IP, dstPort uint16) {
-
-	if dstIP[0] >= 224 || dstIP[len(dstIP)-1] == 255 {
-		// 过滤D类和E类地址 过滤广播
-		return
-	}
+func onUDPData(netif *pipgo.Netif, data []byte, srcIP netip.Addr, srcPort uint16, dstIP netip.Addr, dstPort uint16) {
 
 	go func() {
 		conn, err := net.DialUDP("udp",
 			&net.UDPAddr{IP: outboundIp},
-			&net.UDPAddr{IP: dstIP, Port: int(dstPort)})
+			&net.UDPAddr{IP: dstIP.AsSlice(), Port: int(dstPort)})
 		if err != nil {
 			log.Println(err)
 			return
