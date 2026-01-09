@@ -37,21 +37,13 @@ func (n *Netif) tcpTimerTick() {
 	n.locker.Unlock()
 
 	curTime := time.Now()
-	for key, tcp := range tcps {
-		isRemove := n.tcpCheck(tcp, curTime)
-
-		// 删除连接
-		if isRemove {
-			n.locker.Lock()
-			delete(n.tcps, key)
-			n.locker.Unlock()
-		}
+	for _, tcp := range tcps {
+		n.tcpCheck(tcp, curTime)
+		tcp.processEvents()
 	}
 }
 
 func (n *Netif) tcpCheck(tcp *TCP, curTime time.Time) bool {
-	defer tcp.processEvents()
-
 	tcp.locker.Lock()
 	defer tcp.locker.Unlock()
 

@@ -15,14 +15,13 @@ const (
 type TCPStatus int
 
 const (
-	TCPStatusWaitClosed       TCPStatus = 0
-	TCPStatusWaitEstablishing TCPStatus = 1
-	TCPStatusEstablishing     TCPStatus = 2
-	TCPStatusEstablished      TCPStatus = 3
-	TCPStatusFinWait1         TCPStatus = 4
-	TCPStatusFinWait2         TCPStatus = 5
-	TCPStatusCloseWait        TCPStatus = 6
-	TCPStatusReleased         TCPStatus = 7
+	TCPStatusNone         TCPStatus = 0
+	TCPStatusEstablishing TCPStatus = 1
+	TCPStatusEstablished  TCPStatus = 2
+	TCPStatusFinWait1     TCPStatus = 3
+	TCPStatusFinWait2     TCPStatus = 4
+	TCPStatusCloseWait    TCPStatus = 5
+	TCPStatusReleased     TCPStatus = 6
 )
 
 type TCP struct {

@@ -3,6 +3,7 @@ package pipgo
 import (
 	"net/netip"
 	"sync"
+	"sync/atomic"
 
 	"github.com/plumk97/pip-go/lib/chainbuf"
 	"github.com/plumk97/pip-go/lib/checksum"
@@ -32,7 +33,7 @@ type Netif struct {
 	OnICMPData   OnICMPData   // 接收到ICMP数据
 
 	locker    sync.Mutex
-	identifer uint16          // IP包标识符
+	identifer uint32          // IP包标识符
 	tcps      map[TCPKey]*TCP // 已建立的TCP连接
 	stopTimer chan struct{}   // 停止定时器
 }
@@ -80,10 +81,8 @@ func (n *Netif) Input(bytes []byte) {
 // 输出IP包数据 IPv4
 func (n *Netif) output4(buf *chainbuf.ChainBuffer, proto uint8, src, dst netip.Addr) {
 
-	n.locker.Lock()
-	identifer := n.identifer
-	n.identifer += 1
-	n.locker.Unlock()
+	identifer := atomic.AddUint32(&n.identifer, 1)
+	folded := identifer ^ (identifer >> 16)
 
 	ipHeadBuf := chainbuf.NewChainBuffer(types.NewIPHdr())
 	ipHeadBuf.SetNext(buf)
@@ -93,7 +92,7 @@ func (n *Netif) output4(buf *chainbuf.ChainBuffer, proto uint8, src, dst netip.A
 	hdr.SetIHL(5)
 	hdr.SetTos(0)
 	hdr.SetLen(uint16(ipHeadBuf.TotalLen()))
-	hdr.SetID(identifer)
+	hdr.SetID(uint16(folded))
 	hdr.SetOff(0x4000) // dont fragment flag
 	hdr.SetTTL(64)
 	hdr.SetProtocol(proto)

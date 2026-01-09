@@ -68,6 +68,13 @@ func (tcp *TCP) sendAck() {
 	tcp.sendPacket(packet)
 }
 
+// 发送重置RST并关闭连接
+func (tcp *TCP) sendReset() {
+	packet := newTCPPacket(tcp, types.TH_RST|types.TH_ACK, nil, nil)
+	tcp.sendPacket(packet)
+	tcp.release()
+}
+
 // 处理建立连接
 func (tcp *TCP) handleSyn(options []byte) {
 	tcp.status = TCPStatusEstablishing

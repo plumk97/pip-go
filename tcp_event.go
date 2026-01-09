@@ -51,6 +51,7 @@ func (tcp *TCP) processEvents() {
 			}
 
 		case *tcpClosedEvent:
+			// 删除连接
 			tcp.netif.locker.Lock()
 			delete(tcp.netif.tcps, tcp.key)
 			tcp.netif.locker.Unlock()

@@ -44,7 +44,7 @@ func (tcp *TCP) Connected(handshakeData []byte) {
 	tcp.locker.Lock()
 	defer tcp.locker.Unlock()
 
-	if tcp.status != TCPStatusWaitEstablishing {
+	if tcp.status != TCPStatusEstablishing {
 		return
 	}
 
@@ -64,12 +64,11 @@ func (tcp *TCP) Close() {
 	defer tcp.locker.Unlock()
 
 	switch tcp.status {
-	case TCPStatusWaitClosed:
+	case TCPStatusNone:
 		tcp.release()
 
-	case TCPStatusWaitEstablishing,
-		TCPStatusEstablishing:
-		tcp._reset()
+	case TCPStatusEstablishing:
+		tcp.sendReset()
 
 	case TCPStatusEstablished:
 		tcp.status = TCPStatusFinWait1
@@ -84,19 +83,12 @@ func (tcp *TCP) Close() {
 
 // 重置连接
 func (tcp *TCP) Reset() {
-	tcp.locker.Lock()
-	defer tcp.locker.Unlock()
-	tcp._reset()
-}
 
-func (tcp *TCP) _reset() {
-	switch tcp.status {
-	case TCPStatusWaitEstablishing,
-		TCPStatusEstablishing,
-		TCPStatusEstablished:
-		packet := newTCPPacket(tcp, types.TH_RST|types.TH_ACK, nil, nil)
-		tcp.sendPacket(packet)
-	}
+	tcp.locker.Lock()
+	tcp.sendReset()
+	tcp.locker.Unlock()
+
+	tcp.processEvents()
 }
 
 // 发送数据 返回发送的长度

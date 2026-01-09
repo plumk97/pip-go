@@ -23,45 +23,45 @@ func (n *Netif) tcpInput(data []byte, ipHeader *types.IPHeader) {
 
 	// 查找对应的TCP连接
 	n.locker.Lock()
-	tcp, isOK := n.tcps[key]
+	tcp, exists := n.tcps[key]
 
-	// 不存在的连接 如果是SYN包 则建立一个新的连接
-	if !isOK && hdr.Flags()&types.TH_SYN > 0 {
-		tcp = newTCP(n)
-		tcp.key = key
-		tcp.seq = 0
-		tcp.ipHeader = ipHeader
-		tcp.srcPort = srcPort
-		tcp.dstPort = dstPort
-		n.tcps[key] = tcp
-	}
-	n.locker.Unlock()
-
-	// 不存在的连接 直接返回RST
-	if tcp == nil {
-		if hdr.Flags()&types.TH_RST <= 0 {
-			// 不存在的连接 直接返回RST
+	if !exists {
+		if hdr.Flags()&types.TH_SYN == types.TH_SYN {
+			// 不存在的连接 如果是SYN包 则建立一个新的连接
 			tcp = newTCP(n)
 			tcp.key = key
 			tcp.seq = 0
 			tcp.ipHeader = ipHeader
 			tcp.srcPort = srcPort
 			tcp.dstPort = dstPort
-			tcp.seq = hdr.Ack()
-			tcp.ack = tcpIncreaseSeq(hdr.Seq(), hdr.Flags(), datalen)
+			n.tcps[key] = tcp
 
-			packet := newTCPPacket(tcp, types.TH_RST|types.TH_ACK, nil, nil)
-			tcp.sendPacket(packet)
+		} else {
+			// 不存在的连接 并且不是SYN包 直接返回RST
+			tmpTcp := newTCP(n)
+			tmpTcp.key = key
+			tmpTcp.seq = 0
+			tmpTcp.ipHeader = ipHeader
+			tmpTcp.srcPort = srcPort
+			tmpTcp.dstPort = dstPort
+			tmpTcp.seq = hdr.Ack()
+			tmpTcp.ack = tcpIncreaseSeq(hdr.Seq(), hdr.Flags(), datalen)
+			tmpTcp.sendReset()
 		}
+
+	}
+	n.locker.Unlock()
+
+	if tcp == nil {
 		return
 	}
 
 	tcp.input(hdr, data, data[20:], datalen)
+	tcp.processEvents()
 }
 
 // TCP 处理输入的TCP包
 func (tcp *TCP) input(hdr types.TCPHdr, head []byte, data []byte, datalen uint16) {
-	defer tcp.processEvents()
 
 	tcp.locker.Lock()
 	defer tcp.locker.Unlock()
@@ -71,13 +71,13 @@ func (tcp *TCP) input(hdr types.TCPHdr, head []byte, data []byte, datalen uint16
 		return
 	}
 
-	if hdr.Flags()&types.TH_RST > 0 {
+	if hdr.Flags()&types.TH_RST == types.TH_RST {
 		// 处理RST包
 		tcp.release()
 		return
 	}
 
-	if hdr.Flags()&types.TH_ACK > 0 && hdr.Seq() == tcp.ack-1 {
+	if hdr.Flags()&types.TH_ACK == types.TH_ACK && hdr.Seq() == tcp.ack-1 {
 		// keep-alive 包 直接回复
 		tcp.sendAck()
 		return
@@ -98,12 +98,12 @@ func (tcp *TCP) input(hdr types.TCPHdr, head []byte, data []byte, datalen uint16
 	tcp.oppWind = uint32(hdr.Win()) << uint32(tcp.oppWindShift)
 
 	// 处理ACK和数据包
-	if hdr.Flags()&types.TH_ACK > 0 {
+	if hdr.Flags()&types.TH_ACK == types.TH_ACK {
 		tcp.handleAck(hdr.Ack(), isUpdateWind)
 	}
 
 	// 处理收到的数据
-	if hdr.Flags()&types.TH_PUSH > 0 || datalen > 0 {
+	if hdr.Flags()&types.TH_PUSH == types.TH_PUSH || datalen > 0 {
 		tcp.handleReceive(data)
 	}
 
@@ -112,15 +112,32 @@ func (tcp *TCP) input(hdr types.TCPHdr, head []byte, data []byte, datalen uint16
 		return
 	}
 
-	if hdr.Flags()&types.TH_SYN > 0 {
-		tcp.status = TCPStatusWaitEstablishing
-		tcp.events = append(tcp.events, &tcpNewEvent{
-			head: head,
-		})
+	if hdr.Flags()&types.TH_SYN == types.TH_SYN {
+
+		switch tcp.status {
+		case TCPStatusNone:
+			// 处理新的SYN包 建立连接
+			tcp.status = TCPStatusEstablishing
+			tcp.events = append(tcp.events, &tcpNewEvent{
+				head: head,
+			})
+
+		case TCPStatusEstablishing:
+			// 正在建立连接 收到重复的SYN包 忽略
+
+		case TCPStatusEstablished:
+			// 已经建立连接 收到重复的SYN包 重新发送SYN-ACK
+			tcp.handleSyn(head)
+
+		default:
+			// 其他状态下 收到SYN包 直接回复RST
+			tcp.sendReset()
+
+		}
 	}
 
 	// 处理FIN包
-	if hdr.Flags()&types.TH_FIN > 0 {
+	if hdr.Flags()&types.TH_FIN == types.TH_FIN {
 		tcp.handleFin()
 	}
 }
