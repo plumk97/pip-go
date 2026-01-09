@@ -117,17 +117,17 @@ func (tcp *TCP) input(hdr types.TCPHdr, head []byte, data []byte, datalen uint16
 		switch tcp.status {
 		case TCPStatusNone:
 			// 处理新的SYN包 建立连接
-			tcp.status = TCPStatusEstablishing
+			tcp.status = TCPStatusWaitEstablishing
 			tcp.events = append(tcp.events, &tcpNewEvent{
 				head: head,
 			})
 
-		case TCPStatusEstablishing:
+		case TCPStatusWaitEstablishing, TCPStatusEstablishing:
 			// 正在建立连接 收到重复的SYN包 忽略
 
 		case TCPStatusEstablished:
 			// 已经建立连接 收到重复的SYN包 重新发送SYN-ACK
-			tcp.handleSyn(head)
+			tcp.handleSyn(nil)
 
 		default:
 			// 其他状态下 收到SYN包 直接回复RST

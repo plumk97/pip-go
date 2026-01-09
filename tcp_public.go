@@ -44,7 +44,7 @@ func (tcp *TCP) Connected(handshakeData []byte) {
 	tcp.locker.Lock()
 	defer tcp.locker.Unlock()
 
-	if tcp.status != TCPStatusEstablishing {
+	if tcp.status != TCPStatusWaitEstablishing {
 		return
 	}
 
@@ -67,7 +67,7 @@ func (tcp *TCP) Close() {
 	case TCPStatusNone:
 		tcp.release()
 
-	case TCPStatusEstablishing:
+	case TCPStatusWaitEstablishing, TCPStatusEstablishing:
 		tcp.sendReset()
 
 	case TCPStatusEstablished:
