@@ -93,7 +93,7 @@ func (tcp *TCP) Reset() {
 
 // 发送数据 返回发送的长度
 // @param data 待发送数据
-func (tcp *TCP) Write(data []byte) int {
+func (tcp *TCP) Write(data []byte, isCopy bool) int {
 	tcp.locker.Lock()
 	defer tcp.locker.Unlock()
 
@@ -124,14 +124,22 @@ func (tcp *TCP) Write(data []byte) int {
 		/// 如果当前发送数据大于等于总数据长度 或者 对方窗口为0 则发送PUSH标签
 		isPush := offset+writeLen >= datalen || writeLen >= int(tcp.oppWind)
 
-		payloadBuf := chainbuf.NewChainBuffer(data[offset : offset+writeLen])
+		var buf *chainbuf.ChainBuffer
+		if isCopy {
+			tmpBuf := make([]byte, writeLen)
+			copy(tmpBuf, data[offset:offset+writeLen])
+			buf = chainbuf.NewChainBuffer(tmpBuf)
+
+		} else {
+			buf = chainbuf.NewChainBuffer(data[offset : offset+writeLen])
+		}
 
 		var packet *TCPPacket
 		if isPush {
-			packet = newTCPPacket(tcp, types.TH_PUSH|types.TH_ACK, nil, payloadBuf)
+			packet = newTCPPacket(tcp, types.TH_PUSH|types.TH_ACK, nil, buf)
 			tcp.isWaitPushAck = true
 		} else {
-			packet = newTCPPacket(tcp, types.TH_ACK, nil, payloadBuf)
+			packet = newTCPPacket(tcp, types.TH_ACK, nil, buf)
 		}
 
 		tcp.packetQueue.Push(packet)

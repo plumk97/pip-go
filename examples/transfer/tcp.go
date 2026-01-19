@@ -54,7 +54,7 @@ func (b *tcpBridge) handleBuffer() {
 			break
 		}
 		data := b.buffer.Bytes()
-		n := b.tcp.Write(data)
+		n := b.tcp.Write(data, true)
 		if n <= 0 {
 			break
 		}
