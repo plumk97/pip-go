@@ -3,8 +3,6 @@ package pipgo
 import (
 	"maps"
 	"time"
-
-	"github.com/plumk97/pip-go/types"
 )
 
 func (n *Netif) startTCPTimer() {
@@ -43,52 +41,36 @@ func (n *Netif) tcpTimerTick() {
 	}
 }
 
-func (n *Netif) tcpCheck(tcp *TCP, curTime time.Time) bool {
+func (n *Netif) tcpCheck(tcp *TCP, curTime time.Time) {
 	tcp.locker.Lock()
 	defer tcp.locker.Unlock()
 
 	if tcp.status == TCPStatusReleased {
-		return true
+		return
 	}
 
 	if (tcp.status == TCPStatusFinWait1 || tcp.status == TCPStatusFinWait2 || tcp.status == TCPStatusCloseWait) && (curTime.Sub(tcp.finTime) > 20*time.Second) {
 		// 处于等待关闭状态 并且等待时间已经大于20秒 直接关闭
 		tcp.release()
-		return true
+		return
 	}
 
 	if tcp.packetQueue.Empty() {
-		return false
+		return
 	}
 
 	packet := tcp.packetQueue.Front()
-	if packet != nil {
-		if curTime.Sub(packet.sendTime) >= 2*time.Second {
-			// 数据超过2秒没有确认
-
-			if packet.sendCount > 2 {
-				// 已经发送过2次的直接丢弃
-				tcp.packetQueue.Pop()
-
-				if packet.payloadLen > 0 {
-					hasPush := packet.hdr().Flags()&types.TH_PUSH > 0
-					if hasPush {
-						tcp.isWaitPushAck = false
-					}
-
-					tcp.events = append(tcp.events, &tcpWrittenEvent{
-						writtenLen: packet.payloadLen,
-						hasPush:    hasPush,
-						isDrop:     true,
-					})
-				}
-
-			} else {
-				// 小于2次的重发
-				tcp.resendPacket(packet)
-			}
-		}
+	if curTime.Sub(packet.sendTime) >= 1*time.Second {
+		// 1 秒等待确认
+		return
 	}
 
-	return false
+	if packet.sendCount > 5 {
+		// 重传超过5次 认为连接已经断开 发送RST报文
+		tcp.sendReset()
+	} else {
+		// 重传数据包
+		tcp.resendPacket(packet)
+	}
+
 }

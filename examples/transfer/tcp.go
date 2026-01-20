@@ -33,7 +33,7 @@ func (b *tcpBridge) bindCallbacks() {
 		t.Received(uint16(len(data)))
 	}
 
-	tcp.OnWritten = func(t *pipgo.TCP, writtenLen int, hasPush, isDrop bool) {
+	tcp.OnWritten = func(t *pipgo.TCP, writtenLen int, hasPush bool) {
 		if hasPush || writtenLen == 0 {
 			b.handleBuffer()
 		}

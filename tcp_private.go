@@ -179,13 +179,13 @@ func (tcp *TCP) handleAck(ack uint32, isUpdateWind bool) {
 		}
 		tcp.packetQueue.Pop()
 
-		hasSyn = hdr.Flags()&types.TH_SYN > 0
-		hasFin = hdr.Flags()&types.TH_FIN > 0
+		hasSyn = hdr.Flags()&types.TH_SYN == types.TH_SYN
+		hasFin = hdr.Flags()&types.TH_FIN == types.TH_FIN
 
 		if pkt.payloadLen > 0 {
 			writtenLen += pkt.payloadLen
 
-			if hdr.Flags()&types.TH_PUSH > 0 {
+			if hdr.Flags()&types.TH_PUSH == types.TH_PUSH {
 				hasPush = true
 				tcp.isWaitPushAck = false
 			}
@@ -201,7 +201,6 @@ func (tcp *TCP) handleAck(ack uint32, isUpdateWind bool) {
 		tcp.events = append(tcp.events, &tcpWrittenEvent{
 			writtenLen: writtenLen,
 			hasPush:    hasPush,
-			isDrop:     false,
 		})
 	}
 

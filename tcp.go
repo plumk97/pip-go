@@ -96,8 +96,7 @@ type TCP struct {
 	// 数据发送完成回调 writeen_len完成发送的字节
 	// @param writeen_len 已经发送的字节长度 如果为0 则代表之前对方的wind为0 当前已经更新 可以继续写入
 	// @param has_push 是否包含push包
-	// @param is_drop 该包是否已经丢弃
-	OnWritten func(tcp *TCP, writtenLen int, hasPush bool, isDrop bool)
+	OnWritten func(tcp *TCP, writtenLen int, hasPush bool)
 }
 
 func newTCP(netif *Netif) *TCP {

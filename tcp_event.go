@@ -10,7 +10,6 @@ type tcpConnectedEvent struct {
 type tcpWrittenEvent struct {
 	writtenLen int
 	hasPush    bool
-	isDrop     bool
 }
 
 type tcpReceivedEvent struct {
@@ -42,7 +41,7 @@ func (tcp *TCP) processEvents() {
 
 		case *tcpWrittenEvent:
 			if tcp.OnWritten != nil {
-				tcp.OnWritten(tcp, ev.writtenLen, ev.hasPush, ev.isDrop)
+				tcp.OnWritten(tcp, ev.writtenLen, ev.hasPush)
 			}
 
 		case *tcpReceivedEvent:

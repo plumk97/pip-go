@@ -9,7 +9,7 @@ func (n *Netif) tcpInput(data []byte, ipHeader *types.IPHeader) {
 
 	hdr := types.TCPHdr(data[:20])
 
-	datalen := ipHeader.Datalen - uint16(hdr.Off())*4
+	datalen := ipHeader.Datalen - uint16(hdr.Off()*4)
 
 	srcPort := hdr.SrcPort()
 	dstPort := hdr.DstPort()
@@ -77,7 +77,7 @@ func (tcp *TCP) input(hdr types.TCPHdr, head []byte, data []byte, datalen uint16
 		return
 	}
 
-	if hdr.Flags()&types.TH_ACK == types.TH_ACK && hdr.Seq() == tcp.ack-1 {
+	if hdr.Flags() == types.TH_ACK && hdr.Seq() == tcp.ack-1 {
 		// keep-alive 包 直接回复
 		tcp.sendAck()
 		return
